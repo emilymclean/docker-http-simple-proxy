@@ -23,7 +23,7 @@ A simple docker image to proxy a HTTP request to another server.
 
 
 ```
-docker run -v \
+docker run \
     -e FORWARD_HOST='' \ 
     -e FORWARD_PORT='' \
     -e FORWARD_PROT='' \
