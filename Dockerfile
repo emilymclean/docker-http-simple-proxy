@@ -1,6 +1,6 @@
 # Based on this image -> https://hub.docker.com/r/picoded/http-simple-proxy
 FROM            nginx:alpine
-MAINTAINER      Emily McLean <emilymcleandeveloper@gmail.com>
+LABEL org.opencontainers.image.authors="Emily McLean <emilymcleandeveloper@gmail.com>"
 
 # Makes only the entry point, no other points needed
 RUN mkdir /entrypoint;
@@ -12,25 +12,25 @@ EXPOSE 80
 # Server host to make request to, 
 # you may use a named container of "webhost" instead
 #
-ENV FORWARD_HOST webhost
+ENV FORWARD_HOST=webhost
 
 # The destination server port
-ENV FORWARD_PORT 80
+ENV FORWARD_PORT=80
 
 # The forwarding protocall
-ENV FORWARD_PROT "http"
+ENV FORWARD_PROT="http"
 
 # Nginx proxy read timed, default is 600 seconds (10 minutes)
-ENV PROXY_READ_TIMEOUT 600
+ENV PROXY_READ_TIMEOUT=600
 
 # Client max body size conig (default disabled)
-ENV MAX_BODY_SIZE 100M
+ENV MAX_BODY_SIZE=100M
 
 # Client buffer size, before writing a tmp file
-ENV MAX_BUFFER_SIZE 10M
+ENV MAX_BUFFER_SIZE=10M
 
 # DNS server to use (if configured)
-ENV DNS ""
+ENV DNS=""
 
 # DNS Validity timeframe
 #
@@ -100,4 +100,4 @@ RUN echo '#!/bin/sh'                                                            
 # RUN cat /entrypoint/primer.sh;
 
 ENTRYPOINT ["/entrypoint/primer.sh"]
-CMD nginx -g "daemon off;"
+CMD ["nginx" "-g" "daemon off;"]
