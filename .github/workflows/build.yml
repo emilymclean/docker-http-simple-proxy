@@ -37,6 +37,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Lowercase Repository
+        run: |
+          echo "REPOSITORY_LC=${REPOSITORY,,}" >>${GITHUB_ENV}
+        env:
+          REPOSITORY: '${{ github.repository }}'
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -46,7 +51,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/http-simple-proxy
+            ghcr.io/${{ env.REPOSITORY_LC }}
           tags: |
             type=schedule
             type=ref,event=branch
@@ -69,9 +74,9 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ghcr.io/http-simple-proxy:${{ needs.version.outputs.major }}
-            ghcr.io/http-simple-proxy:${{ needs.version.outputs.version }}
-            ghcr.io/http-simple-proxy:latest
+            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}
+            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
+            ghcr.io/${{ env.REPOSITORY_LC }}:latest
   release:
     runs-on: ubuntu-latest
     needs: 
