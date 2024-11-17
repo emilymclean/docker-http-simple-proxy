@@ -36,7 +36,7 @@ ENV DNS=""
 #
 # This can be set as blank to follow DNS declared settings
 # intentionally set to 10s to avoid DNS storms
-ENV DNS_VALID_TIMEOUT 10s
+ENV DNS_VALID_TIMEOUT=10s
 
 #
 # Prepares the entrypoint primer script, and runs it once
@@ -100,4 +100,4 @@ RUN echo '#!/bin/sh'                                                            
 # RUN cat /entrypoint/primer.sh;
 
 ENTRYPOINT ["/entrypoint/primer.sh"]
-CMD ["nginx" "-g" "daemon off;"]
+CMD ["nginx", "-g", "daemon off;"]
