@@ -21,7 +21,7 @@ jobs = new Mapping {
             new CommandStep {
                 name = "Build image"
                 run = """
-                docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest
+                docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest --load
                 """
             }
             new CommandStep {

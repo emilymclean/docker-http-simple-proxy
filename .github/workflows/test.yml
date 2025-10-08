@@ -24,7 +24,7 @@ jobs:
     - name: Get current latest nginx version
       run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
     - name: Build image
-      run: docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest
+      run: docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest --load
     - name: Test image
       run: |-
         docker network create test-network
