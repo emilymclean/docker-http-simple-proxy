@@ -16,32 +16,30 @@ jobs = new Mapping {
     ["test"] = new Job {
         steps = new Listing {
             common.checkout
-            ...common.dockerSetup
             common.currentNginxVersion
-            (common.dockerBuild) {
-                with = new Mapping {
-                    ["platforms"] = "linux/amd64"
-                    ["load"] = true
-                    ["tags"] = """
-                    test/nginx:latest
-                    """
-                    ["build-args"] = "NGINX_VERSION=${{ env.NGINX_VERSION }}"
-                }
+            new CommandStep {
+                name = "Build image"
+                run = """
+                docker build --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest
+                """
             }
             new CommandStep {
+                name = "Test image"
                 run = """
                 docker network create test-network
                 docker run --rm -d --network test-network --name echo hashicorp/http-echo -text="pong"
                 docker run --rm -d --network test-network --name nginx -p 8080:80 -e FORWARD_HOST=echo -e FORWARD_PORT=5678 test/nginx:latest
                 
                 text=$(curl -s "http://localhost:8080")
-                if [[ $text != *"pong"* ]]; then
-                    echo "Output $text does not contain pong"
-                    docker stop $(docker ps -q)
-                    exit 1
-                fi
-
                 docker stop $(docker ps -q)
+
+                if [[ $text != *"pong"* ]]; then
+                    echo "Output does not contain pong"
+                    echo "$text"
+                    exit 1
+                else
+                    echo "$text"
+                fi
                 """
             }
         }
