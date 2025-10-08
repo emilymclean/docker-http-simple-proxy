@@ -11,7 +11,6 @@ hidden checkout = new ActionStep {
 hidden currentNginxVersion: Step = new CommandStep {
     name = "Get current latest nginx version"
     run = """
-    mapfile -t pklversions < "pkl-versions"
     echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
     """
 }
