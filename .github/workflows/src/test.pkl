@@ -16,12 +16,11 @@ jobs = new Mapping {
     ["test"] = new Job {
         steps = new Listing {
             common.checkout
-            ...common.dockerSetup
             common.currentNginxVersion
             new CommandStep {
                 name = "Build image"
                 run = """
-                docker buildx build --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest
+                docker build --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest
                 """
             }
             new CommandStep {
