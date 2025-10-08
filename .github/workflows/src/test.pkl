@@ -1,0 +1,49 @@
+amends "lib/base.pkl"
+import "lib/common.pkl" as common
+
+name = "Test"
+
+on = new On {
+    pull_request = new PullRequest {
+        branches = new Listing {
+            "main"
+            "develop"
+        }
+    }
+}
+
+jobs = new Mapping {
+    ["test"] = new Job {
+        steps = new Listing {
+            common.checkout
+            ...common.dockerSetup
+            common.currentNginxVersion
+            new CommandStep {
+                name = "Build image"
+                run = """
+                docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest --load
+                """
+            }
+            new CommandStep {
+                name = "Test image"
+                run = """
+                docker network create test-network
+                docker run --rm -d --network test-network --name echo hashicorp/http-echo -text="pong"
+                docker run --rm -d --network test-network --name nginx -p 8080:80 -e FORWARD_HOST=echo -e FORWARD_PORT=5678 test/nginx:latest
+                
+                sleep 5s
+                text=$(curl -s "http://localhost:8080")
+                docker stop $(docker ps -q)
+
+                if [[ $text != *"pong"* ]]; then
+                    echo "Output does not contain pong"
+                    echo "$text"
+                    exit 1
+                else
+                    echo "$text"
+                fi
+                """
+            }
+        }
+    }
+}.toMap().filter((k,v) -> v != null).toMapping()
