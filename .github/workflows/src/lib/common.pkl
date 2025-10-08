@@ -9,7 +9,7 @@ hidden checkout = new ActionStep {
 }
 
 hidden currentNginxVersion: Step = new CommandStep {
-    name = "Get current latest nginx version"
+    name = "Get current nginx version"
     run = """
     echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
     """

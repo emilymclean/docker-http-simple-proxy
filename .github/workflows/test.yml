@@ -21,7 +21,7 @@ jobs:
         registry: https://ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Get current latest nginx version
+    - name: Get current nginx version
       run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
     - name: Build image
       run: docker buildx build . --build-arg NGINX_VERSION=${{ env.NGINX_VERSION }} -t test/nginx:latest --load

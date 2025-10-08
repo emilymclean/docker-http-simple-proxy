@@ -1,0 +1,100 @@
+open module update_pipeline
+extends "lib/base.pkl"
+import "lib/common.pkl"
+
+name = "Update to latest nginx"
+
+on = new On {
+    workflow_dispatch = new WorkflowDispatch {}
+    schedule = new Listing {
+        new Schedule {
+            cron = "0 13 * * 1"
+        }
+    }
+    pull_request = new PullRequest {
+        branches = new Listing {
+            "main"
+            "develop"
+        }
+    }
+}
+
+jobs = new Mapping {
+    ["get-current-version"] = new Job {
+        outputs = new Mapping {
+            ["current-version"] = "${{ env.NGINX_VERSION }}"
+            ["latest-version"] = "${{ steps.cleaned-tool-release.outputs.release }}"
+        }
+        steps = new Listing {
+            common.checkout
+            common.currentNginxVersion
+            new ActionStep {
+                name = "Get latest nginx version"
+                id = "tool-release"
+                uses = "pozetroninc/github-action-get-latest-release@master"
+                with = new Mapping {
+                    ["owner"] = "nginx"
+                    ["repo"] = "nginx"
+                    ["excludes"] = "prerelease, draft"
+                }
+            }
+            new CommandStep {
+                name = "Strip leading \"release-\" from the version string"
+                id = "cleaned-tool-release"
+                run = """
+                latestVersion="${{ steps.tool-release.outputs.release }}"
+                echo "release=${latestVersion##*release-}" >> $GITHUB_OUTPUT
+                """
+            }
+            new CommandStep {
+                name = "Job Summary"
+                run = """
+                echo "### Versions" >> $GITHUB_STEP_SUMMARY
+                echo "Current version: ${{ env.NGINX_VERSION }}" >> $GITHUB_STEP_SUMMARY
+                echo "Latest version: ${{ steps.cleaned-tool-release.outputs.release }}" >> $GITHUB_STEP_SUMMARY
+                """
+            }
+        }
+    }
+    ["update-nginx-version"] = new Job {
+        needs = new Listing {
+            "get-current-version"
+        }
+        `if` = "needs.get-current-version.outputs.current-version != needs.get-current-version.outputs.latest-version && github.event_name != 'pull_request'"
+        permissions = new Mapping {
+            ["contents"] = "write"
+            ["pull-requests"] = "write"
+        }
+        steps = new Listing {
+            common.checkout
+            new CommandStep {
+                name = "Update nginx-version file with latest release"
+                run = """
+                echo "${{ needs.get-current-version.outputs.latest-version }}" > nginx-version
+                """
+            }
+            new ActionStep {
+                name = "Create Pull Request"
+                uses = "peter-evans/create-pull-request@v7"
+                with = new Mapping {
+                    ["branch"] = "emily-worker/update/${{ needs.get-current-version.outputs.latest-version }}-nginx"
+                    ["title"] = "Update nginx from ${{ needs.get-current-version.outputs.current-version }} to ${{ needs.get-current-version.outputs.latest-version }}"
+                    ["assignees"] = "emilymclean"
+                    ["reviewers"] = "emilymclean"
+                    ["token"] = "${{ secrets.WORKER_PAT }}"
+                }
+            }
+        }
+    }
+    ["keep-alive"] = new Job {
+        `if` = "github.event_name == 'schedule'"
+        permissions = new Mapping {
+            ["actions"] = "write"
+        }
+        steps = new Listing {
+            new ActionStep {
+                uses = "liskin/gh-workflow-keepalive@v1"
+            }
+        }
+    }
+}
