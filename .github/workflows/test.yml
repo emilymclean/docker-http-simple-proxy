@@ -31,6 +31,7 @@ jobs:
         docker run --rm -d --network test-network --name echo hashicorp/http-echo -text="pong"
         docker run --rm -d --network test-network --name nginx -p 8080:80 -e FORWARD_HOST=echo -e FORWARD_PORT=5678 test/nginx:latest
 
+        sleep 5s
         text=$(curl -s "http://localhost:8080")
         docker stop $(docker ps -q)
 
