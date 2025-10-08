@@ -1,5 +1,5 @@
 # Based on this image -> https://hub.docker.com/r/picoded/http-simple-proxy
-ARG NGINX_VERSION=1.29.2
+ARG NGINX_VERSION=1.29.1
 FROM nginx:${NGINX_VERSION}-alpine
 LABEL org.opencontainers.image.authors="Emily McLean <emilymcleandeveloper@gmail.com>"
 
