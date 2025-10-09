@@ -1,6 +1,52 @@
 amends "lib/base.pkl"
 import "lib/common.pkl"
 
+local function dockerJob(login: Step, reference: String): Job = new Job {
+    needs = new Listing {
+        "version"
+    }
+    permissions = new Mapping {
+        ["contents"] = "read"
+        ["packages"] = "write"
+    }
+    steps = new Listing {
+        common.checkout
+        common.currentNginxVersion
+        ...common.dockerSetup
+        login
+        (common.dockerBuild) {
+            `if` = "github.ref == 'refs/heads/main'"
+            with = new Mapping {
+                ["context"] = "."
+                ["platforms"] = "linux/amd64,linux/arm64/v8"
+                ["push"] = true
+                ["tags"] = """
+                \(reference):latest
+                \(reference):nightly
+                \(reference):${{ needs.version.outputs.major }}-nightly
+                \(reference):${{ needs.version.outputs.major }}
+                \(reference):${{ needs.version.outputs.version }}
+                """
+                ["build-args"] = "NGINX_VERSION=${{ env.NGINX_VERSION }}"
+            }
+        }
+        (common.dockerBuild) {
+            `if` = "github.ref != 'refs/heads/main'"
+            with = new Mapping {
+                ["context"] = "."
+                ["platforms"] = "linux/amd64,linux/arm64/v8"
+                ["push"] = true
+                ["tags"] = """
+                \(reference):nightly
+                \(reference):${{ needs.version.outputs.major }}-nightly
+                \(reference):${{ needs.version.outputs.version }}
+                """
+                ["build-args"] = "NGINX_VERSION=${{ env.NGINX_VERSION }}"
+            }
+        }
+    }
+}
+
 name = "Build"
 
 on = new On {
@@ -80,66 +126,27 @@ jobs = new Mapping {
             }
         }
     }
-    ["docker-ghcr"] = new Job {
-        needs = new Listing {
-            "version"
-        }
-        permissions = new Mapping {
-            ["contents"] = "read"
-            ["packages"] = "write"
-        }
-        steps = new Listing {
-            common.checkout
-            common.currentNginxVersion
-            new CommandStep {
-                name = "Lowercase repository name"
-                run = """
-                echo "REPOSITORY_LC=${REPOSITORY,,}" >> ${GITHUB_ENV}
-                """
-                env = new Mapping {
-                    ["REPOSITORY"] = "${{ github.repository }}"
-                }
+    ["docker-ghcr"] = dockerJob(
+        new ActionStep {
+            name = "Log in to the Container registry"
+            uses = "docker/login-action@v3"
+            with = new Mapping {
+                ["registry"] = "https://ghcr.io"
+                ["username"] = "${{ github.actor }}"
+                ["password"] = "${{ secrets.GITHUB_TOKEN }}"
             }
-            ...common.dockerSetup
-            new ActionStep {
-                name = "Log in to the Container registry"
-                uses = "docker/login-action@v3"
-                with = new Mapping {
-                    ["registry"] = "https://ghcr.io"
-                    ["username"] = "${{ github.actor }}"
-                    ["password"] = "${{ secrets.GITHUB_TOKEN }}"
-                }
+        },
+        "${{ vars.LOCAL_DOCKER_REFERENCE }}"
+    )
+    ["docker-docker"] = dockerJob(
+        new ActionStep {
+            name = "Log in to the Container registry"
+            uses = "docker/login-action@v3"
+            with = new Mapping {
+                ["username"] = "${{ vars.DOCKER_USERNAME }}"
+                ["password"] = "${{ secrets.DOCKER_PAT }}"
             }
-            (common.dockerBuild) {
-                `if` = "github.ref == 'refs/heads/main'"
-                with = new Mapping {
-                    ["context"] = "."
-                    ["platforms"] = "linux/amd64,linux/arm64/v8"
-                    ["push"] = true
-                    ["tags"] = """
-                    ghcr.io/${{ env.REPOSITORY_LC }}:latest
-                    ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-                    ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-                    ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}
-                    ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
-                    """
-                    ["build-args"] = "NGINX_VERSION=${{ env.NGINX_VERSION }}"
-                }
-            }
-            (common.dockerBuild) {
-                `if` = "github.ref != 'refs/heads/main'"
-                with = new Mapping {
-                    ["context"] = "."
-                    ["platforms"] = "linux/amd64,linux/arm64/v8"
-                    ["push"] = true
-                    ["tags"] = """
-                    ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-                    ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-                    ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
-                    """
-                    ["build-args"] = "NGINX_VERSION=${{ env.NGINX_VERSION }}"
-                }
-            }
-        }
-    }
+        },
+        "${{ vars.DOCKER_DOCKER_REFERENCE }}"
+    )
 }.toMap().filter((k,v) -> v != null).toMapping()

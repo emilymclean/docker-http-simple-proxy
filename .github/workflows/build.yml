@@ -68,10 +68,6 @@ jobs:
         fetch-depth: 0
     - name: Get current nginx version
       run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
-    - name: Lowercase repository name
-      env:
-        REPOSITORY: ${{ github.repository }}
-      run: echo "REPOSITORY_LC=${REPOSITORY,,}" >> ${GITHUB_ENV}
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v3
     - name: Setup Docker Buildx
@@ -90,11 +86,11 @@ jobs:
         platforms: linux/amd64,linux/arm64/v8
         push: true
         tags: |-
-          ghcr.io/${{ env.REPOSITORY_LC }}:latest
-          ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-          ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-          ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}
-          ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:latest
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
         build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
     - name: Build and push Docker image
       if: github.ref != 'refs/heads/main'
@@ -104,7 +100,55 @@ jobs:
         platforms: linux/amd64,linux/arm64/v8
         push: true
         tags: |-
-          ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-          ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-          ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
+  docker-docker:
+    permissions:
+      contents: read
+      packages: write
+    needs:
+    - version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Get current nginx version
+      run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ vars.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PAT }}
+    - name: Build and push Docker image
+      if: github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/arm64/v8
+        push: true
+        tags: |-
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:latest
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
+    - name: Build and push Docker image
+      if: github.ref != 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/arm64/v8
+        push: true
+        tags: |-
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
         build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
