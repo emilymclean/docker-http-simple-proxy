@@ -1,6 +1,8 @@
 amends "lib/base.pkl"
 import "lib/common.pkl"
 
+local platforms = "linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64"
+
 local function dockerJob(login: Step, reference: String): Job = new Job {
     needs = new Listing {
         "version"
@@ -18,7 +20,7 @@ local function dockerJob(login: Step, reference: String): Job = new Job {
             `if` = "github.ref == 'refs/heads/main'"
             with = new Mapping {
                 ["context"] = "."
-                ["platforms"] = "linux/amd64,linux/arm64/v8"
+                ["platforms"] = platforms
                 ["push"] = true
                 ["tags"] = """
                 \(reference):latest
@@ -34,7 +36,7 @@ local function dockerJob(login: Step, reference: String): Job = new Job {
             `if` = "github.ref != 'refs/heads/main'"
             with = new Mapping {
                 ["context"] = "."
-                ["platforms"] = "linux/amd64,linux/arm64/v8"
+                ["platforms"] = platforms
                 ["push"] = true
                 ["tags"] = """
                 \(reference):nightly

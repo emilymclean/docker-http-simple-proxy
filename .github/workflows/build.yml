@@ -83,7 +83,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: '.'
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
         push: true
         tags: |-
           ${{ vars.LOCAL_DOCKER_REFERENCE }}:latest
@@ -97,7 +97,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: '.'
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
         push: true
         tags: |-
           ${{ vars.LOCAL_DOCKER_REFERENCE }}:nightly
@@ -131,7 +131,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: '.'
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
         push: true
         tags: |-
           ${{ vars.DOCKER_DOCKER_REFERENCE }}:latest
@@ -145,7 +145,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: '.'
-        platforms: linux/amd64,linux/arm64/v8
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
         push: true
         tags: |-
           ${{ vars.DOCKER_DOCKER_REFERENCE }}:nightly
