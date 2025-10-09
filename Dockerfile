@@ -1,7 +1,13 @@
 # Based on this image -> https://hub.docker.com/r/picoded/http-simple-proxy
 ARG NGINX_VERSION=1.29.1
 FROM nginx:${NGINX_VERSION}-alpine
+
 LABEL org.opencontainers.image.authors="Emily McLean <emilymcleandeveloper@gmail.com>"
+LABEL org.opencontainers.image.url="https://github.com/emilymclean/docker-http-simple-proxy"
+LABEL org.opencontainers.image.documentation="https://github.com/emilymclean/docker-http-simple-proxy/blob/main/README.md"
+LABEL org.opencontainers.image.source="https://github.com/emilymclean/docker-http-simple-proxy.git"
+LABEL org.opencontainers.image.licenses="MIT"
+
 
 # Makes only the entry point, no other points needed
 RUN mkdir /entrypoint;

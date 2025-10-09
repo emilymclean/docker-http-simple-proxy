@@ -1,9 +1,11 @@
 name: Build
-
-on:
+'on':
   push:
-    branches: [ master, main, develop ]
-
+    branches:
+    - main
+    - develop
+permissions:
+  contents: write
 jobs:
   version:
     runs-on: ubuntu-latest
@@ -11,118 +13,142 @@ jobs:
       version: ${{ steps.gitversion.outputs.semVer }}
       major: ${{ steps.gitversion.outputs.major }}
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: '0'
-      - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v3.0.0
-        with:
-          versionSpec: '5.x'
-      - name: Use GitVersion
-        id: gitversion # step id used as reference for output values
-        uses: gittools/actions/gitversion/execute@v3.0.0
-        with:
-          useConfigFile: true
-          configFilePath: ./gitversion.yml
-      - name: Display SemVer
-        run: |
-          echo "SemVer: ${{ steps.gitversion.outputs.semVer }}"
-  docker:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v3.0.0
+      with:
+        versionSpec: 5.x
+    - id: gitversion
+      name: Use GitVersion
+      uses: gittools/actions/gitversion/execute@v3.0.0
+      with:
+        useConfigFile: true
+        configFilePath: ./gitversion.yml
+    - name: Generate Job Summary
+      run: |-
+        echo "# Version Info
+        Semantic Version: ${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_STEP_SUMMARY
+  release:
+    permissions:
+      contents: write
+    needs:
+    - version
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: version
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Create tag for release
+      uses: rickstaa/action-create-tag@v1
+      with:
+        tag: v${{ needs.version.outputs.version }}
+    - id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ needs.version.outputs.version }}
+        name: Release ${{ needs.version.outputs.version }}
+        prerelease: ${{ github.ref == 'refs/heads/develop' }}
+  docker-ghcr:
     permissions:
       contents: read
       packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Lowercase Repository
-        run: |
-          echo "REPOSITORY_LC=${REPOSITORY,,}" >>${GITHUB_ENV}
-        env:
-          REPOSITORY: '${{ github.repository }}'
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ env.REPOSITORY_LC }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: https://ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Get current nginx version
-        run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        if: github.ref != 'refs/heads/main'
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
-            ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-          build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        if: github.ref == 'refs/heads/main'
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}
-            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.major }}-nightly
-            ghcr.io/${{ env.REPOSITORY_LC }}:${{ needs.version.outputs.version }}
-            ghcr.io/${{ env.REPOSITORY_LC }}:latest
-            ghcr.io/${{ env.REPOSITORY_LC }}:nightly
-          build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
-  release:
+    needs:
+    - version
     runs-on: ubuntu-latest
-    needs: 
-      - version
-    permissions:
-      contents: write
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    if: github.event_name != 'pull_request'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Create tag for release
-        uses: rickstaa/action-create-tag@v1
-        with:
-          tag: v${{ needs.version.outputs.version }}
-      - id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.version.outputs.version }}
-          name: Release ${{ needs.version.outputs.version }}
-          prerelease: ${{ github.ref == 'refs/heads/develop' }}
-      - uses: jimeh/update-tags-action@v1
-        if: github.ref == 'refs/heads/main'
-        with:
-          tags: v${{ needs.version.outputs.major }}
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Get current nginx version
+      run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: https://ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push Docker image
+      if: github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
+        push: true
+        tags: |-
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:latest
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
+    - name: Build and push Docker image
+      if: github.ref != 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
+        push: true
+        tags: |-
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.LOCAL_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
+  docker-docker:
+    permissions:
+      contents: read
+      packages: write
+    needs:
+    - version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Get current nginx version
+      run: echo "NGINX_VERSION=$(cat nginx-version)" >> $GITHUB_ENV
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ vars.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PAT }}
+    - name: Build and push Docker image
+      if: github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
+        push: true
+        tags: |-
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:latest
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
+    - name: Build and push Docker image
+      if: github.ref != 'refs/heads/main'
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        platforms: linux/amd64,linux/ppc64le,linux/386,linux/s390x,linux/arm/v7,linux/arm64/v8,linux/arm/v6,linux/riscv64
+        push: true
+        tags: |-
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.major }}-nightly
+          ${{ vars.DOCKER_DOCKER_REFERENCE }}:${{ needs.version.outputs.version }}
+        build-args: NGINX_VERSION=${{ env.NGINX_VERSION }}
